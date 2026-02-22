@@ -117,7 +117,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           </div>
           <div className="mt-6">
             <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">
-              Operations Hub
+              Operations Hub [SANY]
             </h2>
           </div>
         </div>

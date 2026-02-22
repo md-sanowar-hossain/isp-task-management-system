@@ -13,7 +13,7 @@ interface TaskTableProps {
 
 const TaskTable: React.FC<TaskTableProps> = ({ tasks, currentUser, onDelete, onUpdateStatus }) => {
   // Normalize role check for robust permission handling
-  const isAdmin = currentUser?.role?.toLowerCase() === 'admin';
+  // Permission checks removed: anyone can act
 
   return (
     <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden">
@@ -76,27 +76,16 @@ const TaskTable: React.FC<TaskTableProps> = ({ tasks, currentUser, onDelete, onU
                       {/** using local state to track which task is pending deletion */}
                       
                       {/* Ownership Check Fix: verify against username as recorded in App.tsx addTask */}
-                      {(isAdmin || task.createdBy === currentUser.username) && (
-                        <button
-                          onClick={() => onUpdateStatus(task.id, task.status === 'Complete' ? 'Pending' : 'Complete')}
-                          className="p-2 text-slate-400 hover:text-emerald-600 transition-all bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md active:scale-90"
-                          title="Toggle Status"
-                        >
-                          <CheckCircle size={18} />
-                        </button>
-                      )}
-                      
-                      {(isAdmin || task.createdBy === currentUser.username) && (
-                        <DeleteWithConfirm onConfirm={() => onDelete(task.id)}>
-                          <Trash2 size={18} />
-                        </DeleteWithConfirm>
-                      )}
-
-                      {!(isAdmin || task.createdBy === currentUser.username) && (
-                        <div title="Restricted access" className="p-2 text-slate-200">
-                          <AlertCircle size={18} />
-                        </div>
-                      )}
+                      <button
+                        onClick={() => onUpdateStatus(task.id, task.status === 'Complete' ? 'Pending' : 'Complete')}
+                        className="p-2 text-slate-400 hover:text-emerald-600 transition-all bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md active:scale-90"
+                        title="Toggle Status"
+                      >
+                        <CheckCircle size={18} />
+                      </button>
+                      <DeleteWithConfirm onConfirm={() => onDelete(task.id)}>
+                        <Trash2 size={18} />
+                      </DeleteWithConfirm>
                     </div>
                   </td>
                 </tr>
@@ -113,57 +102,65 @@ export default TaskTable;
 
 // Small inline delete confirmation component used by tables
 function DeleteWithConfirm({ children, onConfirm }: { children: React.ReactNode; onConfirm: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement | null>(null);
+  const [open, setOpen] = React.useState(false);
+  const [position, setPosition] = React.useState<{ top: number; left: number } | null>(null);
+  const btnRef = React.useRef<HTMLButtonElement | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const handle = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (btnRef.current && btnRef.current.contains(target)) return;
-      setOpen(false);
-    };
-    document.addEventListener('mousedown', handle);
-    return () => document.removeEventListener('mousedown', handle);
-  }, [open]);
-
-  const toggle = () => {
-    if (!btnRef.current) return setOpen(s => !s);
+  const handleClick = () => {
+    if (!btnRef.current) return;
     const rect = btnRef.current.getBoundingClientRect();
-    const left = rect.left + rect.width / 2;
-    const top = rect.top + rect.height + 8;
-    setCoords({ top, left });
-    setOpen(s => !s);
+    setPosition({
+      top: rect.top + rect.height / 2,
+      left: rect.left - 8,
+    });
+    setOpen(true);
   };
 
   return (
     <>
-      <button ref={btnRef} onClick={toggle} className="p-2 text-rose-400 hover:text-white hover:bg-rose-600 transition-all bg-white rounded-xl border border-rose-100 hover:border-rose-600 shadow-sm active:scale-90">
+      <button
+        ref={btnRef}
+        onClick={handleClick}
+        className="p-2 text-rose-400 hover:text-white hover:bg-rose-600 transition-all bg-white rounded-xl border border-rose-100 hover:border-rose-600 shadow-sm active:scale-90"
+      >
         {children}
       </button>
-              {open && coords && createPortal(
-        <div style={{ position: 'fixed', top: coords.top, left: coords.left, transform: 'translateX(-50%)' }}>
-          <div className="w-48 bg-white border border-slate-200 rounded-xl shadow-lg p-3 z-50">
-            <div className="text-sm font-black text-slate-900 mb-2">Confirm deletion?</div>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setOpen(false)} className="px-3 py-1 rounded-xl bg-slate-100 text-slate-700 font-bold">Cancel</button>
-              <button
-  onClick={async () => {
-    try {
-      await onConfirm();
-    } finally {
-      setOpen(false);
-    }
-  }}
-  className="px-3 py-1 rounded-xl bg-rose-600 text-white font-black"
->
-  Delete
-</button>
+      {open && position &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: position.top,
+              left: position.left,
+              transform: "translate(-100%, -50%)",
+              zIndex: 9999,
+            }}
+          >
+            <div className="w-60 bg-white border border-slate-200 rounded-xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-150">
+              <div className="text-sm font-bold text-slate-800 mb-3">
+                Confirm deletion?
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setOpen(false)}
+                  className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    onConfirm();
+                    setOpen(false);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-rose-600 text-white font-bold hover:bg-rose-700 transition"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
-          </div>
-        </div>, document.body)
-      }
+          </div>,
+          document.body
+        )}
     </>
   );
 }

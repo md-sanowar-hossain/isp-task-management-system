@@ -131,41 +131,27 @@ const App: React.FC = () => {
     }
   };
 
-// ---------- DELETE TASK (Supabase delete with permission check) ----------
+// ---------- DELETE TASK (Supabase delete, no permission check) ----------
 const deleteTask = async (id: any) => {
-
-  if (!currentUser) return;
-
-  const isAdmin =
-    currentUser.role?.toLowerCase().trim() === "admin";
-
-  const taskToDelete = tasks.find(t => String(t.id) === String(id));
-
-  const isCreator =
-    taskToDelete &&
-    currentUser.username === taskToDelete.createdBy;
-
-  if (!isAdmin && !isCreator) {
-    alert("Permission denied.");
-    return;
-  }
-
   try {
+    console.log('deleteTask called with id:', id);
     const { error } = await supabase
       .from("tasks")
       .delete()
       .eq("id", id);
 
     if (error) {
+      alert("Delete error: " + (error.message || error));
       console.error("Delete error:", error);
       return;
     }
 
     // optimistic UI update
     setTasks(prev => prev.filter(t => String(t.id) !== String(id)));
-
+    console.log('Task deleted successfully:', id);
   } catch (err) {
-    console.error(err);
+    alert('Delete failed: ' + (err?.message || err));
+    console.error('deleteTask unexpected error:', err);
   }
 };
   // ---------- UPDATE STATUS (Supabase update) ----------
@@ -371,6 +357,21 @@ ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
           <button onClick={() => { setCurrentUser(null); localStorage.removeItem('dklink_current_user'); }} className="w-full flex items-center gap-4 px-6 py-4 font-black text-xs text-slate-500 hover:text-[#e11d48] transition-colors uppercase tracking-widest">
             <LogOut size={20} strokeWidth={3} /> Terminate
           </button>
+          <div className="mt-6 text-center select-none">
+            <a
+              href="https://sanowar.pro.bd"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Open SANY portfolio in new tab"
+              title="Open SANY portfolio"
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 text-rose-200 text-[12px] font-semibold tracking-wide border border-white/10 shadow-sm hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-rose-600/30"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0 opacity-90 text-rose-400">
+                <path d="M12 2l2.9 6.26L21 9.27l-5 3.73L17.8 21 12 17.77 6.2 21 7 13l-5-3.73 6.1-1.01L12 2z" fill="currentColor" />
+              </svg>
+              <span className="leading-none">Created by SANY</span>
+            </a>
+          </div>
         </div>
       </aside>
 
@@ -477,16 +478,39 @@ ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
                       </div>
                     </div>
                   ))}
+                  {isChatting && (
+                    <div className="flex justify-start">
+                      <div className="p-3 rounded-xl bg-white border text-slate-700 flex items-center gap-2">
+                        <span className="animate-bounce">•</span>
+                        <span className="animate-pulse">Gemini is typing...</span>
+                      </div>
+                    </div>
+                  )}
                   <div ref={chatEndRef} />
                 </div>
-                <form onSubmit={handleSendChatMessage} className="relative mt-4">
-                  <input type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder="Ask Gemini..." className="w-full px-4 py-3 border rounded-xl" />
+                <form onSubmit={handleSendChatMessage} className="relative mt-4 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    placeholder="Ask Gemini..."
+                    className="flex-1 px-4 py-3 border rounded-xl bg-white/95 text-slate-900 outline-none"
+                  />
+                  <button
+                    type="submit"
+                    aria-label="Send message to Gemini"
+                    className="inline-flex items-center gap-2 px-4 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest transition-shadow shadow-sm"
+                  >
+                    <Send size={16} />
+                    <span className="hidden sm:inline">Send</span>
+                  </button>
                 </form>
               </div>
             </div>
           )}
         </div>
       </main>
+
     </div>
   );
 };

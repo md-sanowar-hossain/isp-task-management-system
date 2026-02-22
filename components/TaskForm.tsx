@@ -20,7 +20,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ taskTypes, areas, onSave, onCancel 
     userId: '',
     taskType: '',
     area: '',
-    status: '' as Status | '',
+    status: 'Pending' as Status,
     remarks: '',
   });
 
@@ -70,7 +70,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ taskTypes, areas, onSave, onCancel 
       userId: '',
       taskType: '',
       area: '',
-      status: '',
+      status: 'Pending',
       remarks: '',
     });
     setDateObj(new Date());
