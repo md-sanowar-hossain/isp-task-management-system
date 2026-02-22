@@ -148,7 +148,18 @@ function DeleteWithConfirm({ children, onConfirm }: { children: React.ReactNode;
             <div className="text-sm font-black text-slate-900 mb-2">Confirm deletion?</div>
             <div className="flex justify-end gap-2">
               <button onClick={() => setOpen(false)} className="px-3 py-1 rounded-xl bg-slate-100 text-slate-700 font-bold">Cancel</button>
-              <button onClick={() => { onConfirm(); setOpen(false); }} className="px-3 py-1 rounded-xl bg-rose-600 text-white font-black">Delete</button>
+              <button
+  onClick={async () => {
+    try {
+      await onConfirm();
+    } finally {
+      setOpen(false);
+    }
+  }}
+  className="px-3 py-1 rounded-xl bg-rose-600 text-white font-black"
+>
+  Delete
+</button>
             </div>
           </div>
         </div>, document.body)

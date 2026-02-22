@@ -11,32 +11,29 @@ import UserManagement from './components/UserManagement';
 import AnalyticsReport from './components/AnalyticsReport';
 import { getAIAnalysis, startAIChat } from './services/geminiService';
 import * as XLSX from 'xlsx';
+import { supabase } from './services/supabaseClient';
 
 const App: React.FC = () => {
+  // ---------- user session (kept in localStorage like before) ----------
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('dklink_current_user');
     return saved ? JSON.parse(saved) : null;
   });
 
+  useEffect(() => {
+    if (currentUser) localStorage.setItem('dklink_current_user', JSON.stringify(currentUser));
+    else localStorage.removeItem('dklink_current_user');
+  }, [currentUser]);
+
+  // ---------- UI state ----------
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tasks' | 'analytics' | 'ai' | 'workspace' | 'users'>('tasks');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
-  // Lazy initialization with ID sanitization for legacy data
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem('dklink_tasks_v4');
-    if (!saved) return [];
-    try {
-      const parsed: Task[] = JSON.parse(saved);
-      // Ensure every task has an ID for robust deletion
-      return parsed.map(t => ({
-        ...t,
-        id: t.id || Math.random().toString(36).substring(2, 11)
-      }));
-    } catch (e) {
-      return [];
-    }
-  });
 
+  // ---------- TASKS (now from Supabase) ----------
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [maxSerialSeen, setMaxSerialSeen] = useState<number>(0);
+
+  // ---------- ancillary persisted lists (kept in localStorage) ----------
   const [taskTypes, setTaskTypes] = useState<string[]>(() => {
     const saved = localStorage.getItem('dklink_task_types');
     return saved ? JSON.parse(saved) : INITIAL_TYPES;
@@ -47,21 +44,19 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : INITIAL_AREAS;
   });
 
-  // Search & Filter State
+  useEffect(() => {
+    localStorage.setItem('dklink_task_types', JSON.stringify(taskTypes));
+  }, [taskTypes]);
+
+  useEffect(() => {
+    localStorage.setItem('dklink_areas', JSON.stringify(areas));
+  }, [areas]);
+
+  // ---------- Search & filter ----------
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Complete' | 'Pending'>('All');
 
-  const [maxSerialSeen, setMaxSerialSeen] = useState(() => {
-    const saved = localStorage.getItem('dklink_tasks_v4');
-    if (!saved) return 0;
-    try {
-      const parsed: Task[] = JSON.parse(saved);
-      return parsed.reduce((max: number, task: Task) => Math.max(max, task.serialNo), 0);
-    } catch (e) {
-      return 0;
-    }
-  });
-
+  // ---------- AI/chat state (kept as-is) ----------
   const [aiInsight, setAiInsight] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai', text: string }[]>([]);
@@ -71,69 +66,133 @@ const App: React.FC = () => {
   const chatSessionRef = useRef<any>(null);
 
   useEffect(() => {
-    if (currentUser) localStorage.setItem('dklink_current_user', JSON.stringify(currentUser));
-    else localStorage.removeItem('dklink_current_user');
-  }, [currentUser]);
-
-  useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, isChatting]);
 
-  const addTask = (data: Omit<Task, 'id' | 'serialNo' | 'month' | 'createdBy'>) => {
-    if (!currentUser) return;
-    const dateObj = new Date(data.date);
-    const newSn = maxSerialSeen + 1;
-    setMaxSerialSeen(newSn);
-    
-    setTasks(prev => {
-      const nt: Task = {
-        ...data,
-        id: Math.random().toString(36).substring(2, 11),
-        serialNo: newSn,
-        month: MONTHS[dateObj.getMonth()],
-        createdBy: currentUser.username
-      };
-      const nextTasks = [nt, ...prev];
-      localStorage.setItem('dklink_tasks_v4', JSON.stringify(nextTasks));
-      return nextTasks;
-    });
+  // ---------- FETCH TASKS from Supabase ----------
+  useEffect(() => {
+    fetchTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchTasks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .order('serialNo', { ascending: false });
+
+      if (error) {
+        console.error('Supabase fetch error:', error);
+        return;
+      }
+
+      const tasksData = (data || []) as Task[];
+      setTasks(tasksData);
+
+      // update max serial seen from DB
+      const max = tasksData.reduce((m, t) => Math.max(m, t.serialNo || 0), 0);
+      setMaxSerialSeen(max);
+    } catch (err) {
+      console.error('fetchTasks unexpected error:', err);
+    }
   };
 
-  const deleteTask = (id: string) => {
-    // Allow deletion if the current user is an admin (trimmed) or the creator of the task
-    const isAdmin = !!currentUser?.role && currentUser.role.toLowerCase().trim() === 'admin';
-    const taskToDelete = tasks.find(t => t.id === id);
-    const isCreator = !!taskToDelete && currentUser?.username === taskToDelete.createdBy;
-
-    if (!isAdmin && !isCreator) {
-      alert("Action denied: only administrators or the task creator can delete this record.");
+  // ---------- ADD TASK (Supabase insert) ----------
+  const addTask = async (data: Omit<Task, 'id' | 'serialNo' | 'month' | 'createdBy'>) => {
+    if (!currentUser) {
+      alert('No user logged in.');
       return;
     }
 
-    // Immediate functional update with persistence
-    setTasks(prev => {
-      const nextTasks = prev.filter(t => t.id !== id);
-      localStorage.setItem('dklink_tasks_v4', JSON.stringify(nextTasks));
-      return nextTasks;
-    });
+    try {
+      const dateObj = new Date(data.date);
+      const newSerial = maxSerialSeen + 1;
+
+      const insertPayload = {
+        ...data,
+        serialNo: newSerial,
+        month: MONTHS[dateObj.getMonth()],
+        createdBy: currentUser.username,
+      };
+
+      const { error } = await supabase.from('tasks').insert([insertPayload]);
+
+      if (error) {
+        console.error('Insert error:', error);
+        alert('Could not add task. See console.');
+        return;
+      }
+
+      // refresh
+      await fetchTasks();
+    } catch (err) {
+      console.error('addTask unexpected:', err);
+    }
   };
 
-  const updateStatus = (id: string, status: Status) => {
-    if (!currentUser) return;
-    setTasks(prev => {
-      const nextTasks = prev.map(t => {
-        if (t.id !== id) return t;
-        // When marking complete, set `completedBy`; when reverting to pending, clear it
-        if (status === 'Complete') return { ...t, status, completedBy: currentUser.username };
-        return { ...t, status, completedBy: undefined };
-      });
-      localStorage.setItem('dklink_tasks_v4', JSON.stringify(nextTasks));
-      return nextTasks;
-    });
+// ---------- DELETE TASK (Supabase delete with permission check) ----------
+const deleteTask = async (id: any) => {
+
+  if (!currentUser) return;
+
+  const isAdmin =
+    currentUser.role?.toLowerCase().trim() === "admin";
+
+  const taskToDelete = tasks.find(t => String(t.id) === String(id));
+
+  const isCreator =
+    taskToDelete &&
+    currentUser.username === taskToDelete.createdBy;
+
+  if (!isAdmin && !isCreator) {
+    alert("Permission denied.");
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from("tasks")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Delete error:", error);
+      return;
+    }
+
+    // optimistic UI update
+    setTasks(prev => prev.filter(t => String(t.id) !== String(id)));
+
+  } catch (err) {
+    console.error(err);
+  }
+};
+  // ---------- UPDATE STATUS (Supabase update) ----------
+  const updateStatus = async (id: string, status: Status) => {
+    if (!currentUser) {
+      alert('No user logged in.');
+      return;
+    }
+
+    try {
+      const updateData: any = { status };
+      updateData.completedBy = status === 'Complete' ? currentUser.username : null;
+
+      const { error } = await supabase.from('tasks').update(updateData).eq('id', id);
+      if (error) {
+        console.error('Update status error:', error);
+        alert('Could not update status. See console.');
+        return;
+      }
+
+      await fetchTasks();
+    } catch (err) {
+      console.error('updateStatus unexpected:', err);
+    }
   };
 
+  // ---------- Task-type & area management (kept using localStorage) ----------
   const updateTaskTypes = (updater: (prev: string[]) => string[]) => {
     setTaskTypes(prev => {
       const next = updater(prev);
@@ -150,18 +209,19 @@ const App: React.FC = () => {
     });
   };
 
+  // ---------- Filtered tasks for UI ----------
   const filteredTasks = tasks.filter(task => {
-    const matchesSearch = 
-      task.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.taskType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.area.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch =
+      task.userId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      task.taskType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      task.area?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (task.remarks && task.remarks.toLowerCase().includes(searchTerm.toLowerCase()));
-    
+
     const matchesStatus = statusFilter === 'All' || task.status === statusFilter;
-    
     return matchesSearch && matchesStatus;
   });
 
+  // ---------- AI / Chat helpers (unchanged) ----------
   const runAnalysis = async () => {
     if (tasks.length === 0) {
       alert("Registry empty: No data for analysis.");
@@ -200,6 +260,7 @@ const App: React.FC = () => {
     }
   };
 
+  // ---------- Export to Excel (keeps working, uses current tasks state) ----------
   const exportExcel = () => {
     if (tasks.length === 0) {
       alert("No data to export.");
@@ -254,6 +315,7 @@ const App: React.FC = () => {
     XLSX.writeFile(wb, "ISP_Task_System.xlsx");
   };
 
+  // ---------- UI helpers ----------
   if (!currentUser) return <Auth onLogin={setCurrentUser} />;
 
   const getHeaderTitle = () => {
@@ -270,7 +332,8 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#f8fafc] font-['Inter'] text-slate-900">
-      <aside className={`fixed md:relative z-50 h-full w-72 bg-[#0f172a] text-slate-300 flex flex-col transition-transform duration-500 ease-in-out shadow-2xl print:hidden ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+     <aside className={`fixed lg:relative z-50 h-full lg:h-auto w-72 bg-[#0f172a] text-slate-300 flex flex-col transition-transform duration-300 shadow-2xl print:hidden 
+${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="p-8 border-b border-slate-800 flex items-center justify-between bg-[#0c1221]">
           <div className="flex items-center gap-2">
             <span className="text-3xl font-black text-[#e11d48] tracking-tighter">dk</span>
