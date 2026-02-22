@@ -41,9 +41,9 @@ const TaskTable: React.FC<TaskTableProps> = ({ tasks, currentUser, onDelete, onU
                 </td>
               </tr>
             ) : (
-              tasks.map((task) => (
+              tasks.map((task, index) => (
                 <tr key={task.id} className="hover:bg-slate-50/50 transition-all duration-300 animate-in fade-in slide-in-from-left-2 group">
-                  <td className="px-6 py-5 text-sm font-bold text-slate-900">{task.serialNo}</td>
+                  <td className="px-6 py-5 text-sm font-bold text-slate-900">{tasks.length - index}</td>
                   <td className="px-6 py-5 text-sm text-slate-600 font-medium">{task.date}</td>
                   <td className="px-6 py-5 text-sm text-slate-900 font-black">{task.userId}</td>
                   <td className="px-6 py-5 text-sm text-slate-700 font-medium">{task.createdBy}</td>

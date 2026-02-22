@@ -148,7 +148,9 @@ const deleteTask = async (id: any) => {
 
     // optimistic UI update
     setTasks(prev => prev.filter(t => String(t.id) !== String(id)));
-    console.log('Task deleted successfully:', id);
+    // re-sync with server to ensure counts and derived state are correct
+    await fetchTasks();
+    console.log('Task deleted successfully and tasks refreshed:', id);
   } catch (err) {
     alert('Delete failed: ' + (err?.message || err));
     console.error('deleteTask unexpected error:', err);
