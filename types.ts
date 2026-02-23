@@ -11,6 +11,7 @@ export interface User {
   id: string;
   username: string;
   role: Role;
+  workspace_id?: string;
 }
 
 export interface Task {

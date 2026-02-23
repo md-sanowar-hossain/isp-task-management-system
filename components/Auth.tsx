@@ -44,11 +44,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         if (error || !data) {
           setError('Invalid login credentials.');
         } else {
-          onLogin({
-            id: data.id,
-            username: data.username,
-            role: data.role,
-          });
+          // pass the full user row (includes workspace_id)
+          onLogin(data);
         }
 
       } else {
@@ -65,6 +62,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           return;
         }
 
+        // Create user, then initialize a new workspace for them by setting workspace_id to their id
         const { data, error } = await supabase
           .from('users')
           .insert([
@@ -72,23 +70,34 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               fullName: username,
               username,
               password,
-              role: 'User'
+              role: 'Admin' // new registrant becomes workspace owner/admin
             }
           ])
           .select()
           .single();
 
-        if (error) {
+        if (error || !data) {
           setError('Registration failed.');
         } else {
-          setSuccess('Account created successfully!');
-          setTimeout(() => {
-            onLogin({
-              id: data.id,
-              username: data.username,
-              role: data.role,
-            });
-          }, 800);
+          try {
+            // create a workspace record (use the new user's id as workspace id)
+            try {
+              await supabase.from('workspaces').insert([{ id: data.id, name: username }]);
+            } catch (wErr) {
+              // if workspaces table doesn't exist or insert fails, continue
+              console.warn('Could not create workspace row:', wErr);
+            }
+
+            // set workspace_id to the newly created user's id (isolated workspace)
+            await supabase.from('users').update({ workspace_id: data.id }).eq('id', data.id);
+            const { data: fresh } = await supabase.from('users').select('*').eq('id', data.id).single();
+            setSuccess('Account created successfully!');
+            setTimeout(() => {
+              onLogin(fresh);
+            }, 800);
+          } catch (e) {
+            setError('Registration post-setup failed.');
+          }
         }
       }
     } catch (err) {

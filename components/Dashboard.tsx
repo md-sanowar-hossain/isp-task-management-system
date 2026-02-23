@@ -9,19 +9,25 @@ import { AREAS, MONTHS, COLORS as BRAND_COLORS } from '../constants';
 
 interface DashboardProps {
   tasks: Task[];
+  areas?: string[]; // optional workspace-specific areas
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
+const Dashboard: React.FC<DashboardProps> = ({ tasks, areas }) => {
   const stats = {
     total: tasks.length,
     complete: tasks.filter(t => t.status === 'Complete').length,
     pending: tasks.filter(t => t.status === 'Pending').length,
   };
 
-  const areaData = AREAS.map(area => ({
+  // prefer workspace-specific areas when provided; fall back to global AREAS
+  const areaList = (areas && areas.length > 0) ? areas : AREAS;
+  const areaData = areaList.map(area => ({
     name: area,
     value: tasks.filter(t => t.area === area).length
   }));
+
+  // remove zero-count areas so the chart and legend reflect workspace data only
+  const filteredAreaData = areaData.filter(a => a.value > 0);
 
   const monthData = MONTHS.map(month => ({
     name: month.substring(0, 3),
@@ -71,7 +77,7 @@ const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={areaData}
+                    data={filteredAreaData}
                   cx="50%"
                   cy="50%"
                   innerRadius={80}
@@ -80,9 +86,9 @@ const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
                   dataKey="value"
                   stroke="none"
                 >
-                  {areaData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={BRAND_COLORS.chart[index % BRAND_COLORS.chart.length]} />
-                  ))}
+                    {filteredAreaData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={BRAND_COLORS.chart[index % BRAND_COLORS.chart.length]} />
+                    ))}
                 </Pie>
                 <Tooltip 
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}

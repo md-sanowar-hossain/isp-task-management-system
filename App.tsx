@@ -29,6 +29,17 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tasks' | 'analytics' | 'ai' | 'workspace' | 'users'>('tasks');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const isAdmin = (u: User | null) => {
+    if (!u || !u.role) return false;
+    return String(u.role).toLowerCase().includes('admin');
+  };
+
+  const [notice, setNotice] = useState<string | null>(null);
+  const showNotice = (msg: string, ms = 3000) => {
+    setNotice(msg);
+    setTimeout(() => setNotice(null), ms);
+  };
+
   // ---------- TASKS (now from Supabase) ----------
   const [tasks, setTasks] = useState<Task[]>([]);
   const [maxSerialSeen, setMaxSerialSeen] = useState<number>(0);
@@ -70,16 +81,54 @@ const App: React.FC = () => {
   }, [chatMessages, isChatting]);
 
   // ---------- FETCH TASKS from Supabase ----------
+  // Run fetchTasks whenever currentUser changes (login/logout)
   useEffect(() => {
-    fetchTasks();
+    let channel: any | null = null;
+
+    const setup = async () => {
+      if (!currentUser || !currentUser.workspace_id) {
+        setTasks([]);
+        return;
+      }
+
+      setActiveTab('tasks');
+      await fetchTasks();
+
+      try {
+        channel = supabase
+          .channel(`tasks_ws_${currentUser.workspace_id}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `workspace_id=eq.${currentUser.workspace_id}` }, (payload) => {
+            console.log('realtime tasks event:', payload.eventType, payload);
+            fetchTasks();
+          })
+          .subscribe();
+      } catch (err) {
+        console.warn('Could not open realtime channel for tasks', err);
+      }
+    };
+
+    setup();
+
+    return () => {
+      if (channel && typeof channel.unsubscribe === 'function') {
+        try { channel.unsubscribe(); } catch (e) { /* ignore */ }
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentUser]);
+
+  // (Removed admin-only redirect: management pages should be accessible
+  //  to all members of the same workspace. Access controls are enforced
+  //  server-side via workspace-scoped queries.)
 
   const fetchTasks = async () => {
+    if (!currentUser || !currentUser.workspace_id) return;
+
     try {
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
+        .eq('workspace_id', currentUser.workspace_id)   // 🔥 workspace filter
         .order('serialNo', { ascending: false });
 
       if (error) {
@@ -90,9 +139,14 @@ const App: React.FC = () => {
       const tasksData = (data || []) as Task[];
       setTasks(tasksData);
 
-      // update max serial seen from DB
       const max = tasksData.reduce((m, t) => Math.max(m, t.serialNo || 0), 0);
       setMaxSerialSeen(max);
+      // debugging: confirm workspace scoping at runtime
+      try {
+        console.log(`fetchTasks: workspace_id=${currentUser?.workspace_id} loaded=${tasksData.length}`);
+      } catch (e) {
+        console.log('fetchTasks: loaded tasks (logging failed)');
+      }
     } catch (err) {
       console.error('fetchTasks unexpected error:', err);
     }
@@ -114,6 +168,7 @@ const App: React.FC = () => {
         serialNo: newSerial,
         month: MONTHS[dateObj.getMonth()],
         createdBy: currentUser.username,
+        workspace_id: currentUser.workspace_id, // 🔥 ensure workspace is set on insert
       };
 
       const { error } = await supabase.from('tasks').insert([insertPayload]);
@@ -133,12 +188,18 @@ const App: React.FC = () => {
 
 // ---------- DELETE TASK (Supabase delete, no permission check) ----------
 const deleteTask = async (id: any) => {
+  if (!currentUser || !currentUser.workspace_id) {
+    alert('No workspace context.');
+    return;
+  }
+
   try {
-    console.log('deleteTask called with id:', id);
+    console.log('deleteTask called with id:', id, 'workspace:', currentUser.workspace_id);
     const { error } = await supabase
       .from("tasks")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq('workspace_id', currentUser.workspace_id); // ensure workspace-scoped delete
 
     if (error) {
       alert("Delete error: " + (error.message || error));
@@ -167,7 +228,10 @@ const deleteTask = async (id: any) => {
       const updateData: any = { status };
       updateData.completedBy = status === 'Complete' ? currentUser.username : null;
 
-      const { error } = await supabase.from('tasks').update(updateData).eq('id', id);
+      const { error } = await supabase.from('tasks')
+        .update(updateData)
+        .eq('id', id)
+        .eq('workspace_id', currentUser.workspace_id); // ensure workspace-scoped update
       if (error) {
         console.error('Update status error:', error);
         alert('Could not update status. See console.');
@@ -211,18 +275,40 @@ const deleteTask = async (id: any) => {
 
   // ---------- AI / Chat helpers (unchanged) ----------
   const runAnalysis = async () => {
-    if (tasks.length === 0) {
-      alert("Registry empty: No data for analysis.");
+    if (!currentUser || !currentUser.workspace_id) {
+      alert('No workspace context: please login.');
       return;
     }
+
     setActiveTab('ai');
     setIsAnalyzing(true);
     setAiInsight(null);
     setChatMessages([]);
     try {
-      const res = await getAIAnalysis(tasks);
+      // Fetch latest workspace-scoped tasks directly to ensure analysis limited to this workspace
+      const { data: wsTasks, error: wsErr } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('workspace_id', currentUser.workspace_id)
+        .order('serialNo', { ascending: false });
+
+      if (wsErr) {
+        console.error('Could not load workspace tasks for analysis:', wsErr);
+        setAiInsight('Analysis failed: could not load workspace data.');
+        return;
+      }
+
+      const workspaceTasks = (wsTasks || []) as Task[];
+
+      if (workspaceTasks.length === 0) {
+        alert('Registry empty for this workspace: No data for analysis.');
+        setAiInsight('No data to analyze in this workspace.');
+        return;
+      }
+
+      const res = await getAIAnalysis(workspaceTasks);
       setAiInsight(res);
-      chatSessionRef.current = startAIChat(tasks);
+      chatSessionRef.current = startAIChat(workspaceTasks);
     } catch (err) {
       setAiInsight("Critical failure in reasoning engine.");
     } finally {
@@ -320,6 +406,11 @@ const deleteTask = async (id: any) => {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#f8fafc] font-['Inter'] text-slate-900">
+      {notice && (
+        <div className="fixed top-4 right-4 z-50">
+          <div className="px-4 py-2 bg-rose-600 text-white rounded-lg shadow-md font-bold">{notice}</div>
+        </div>
+      )}
      <aside className={`fixed lg:relative z-50 h-full lg:h-auto w-72 bg-[#0f172a] text-slate-300 flex flex-col transition-transform duration-300 shadow-2xl print:hidden 
 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="p-8 border-b border-slate-800 flex items-center justify-between bg-[#0c1221]">
@@ -343,15 +434,17 @@ ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
               </button>
             );
           })}
-          {currentUser.role?.toLowerCase() === 'admin' && (
+          {currentUser && currentUser.workspace_id && (
             <div className="pt-6 border-t border-slate-800 mt-6 space-y-2">
               <div className="px-6 mb-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Management</div>
               <button onClick={() => { setActiveTab('workspace'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'workspace' ? 'bg-white/10 text-[#e11d48] border border-white/5' : 'hover:bg-slate-800/50'}`}>
                 <Settings size={20} /> Settings
               </button>
-              <button onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'users' ? 'bg-white/10 text-[#e11d48] border border-white/5' : 'hover:bg-slate-800/50'}`}>
-                <Users size={20} /> Team Users
-              </button>
+              {isAdmin(currentUser) && (
+                <button onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'users' ? 'bg-white/10 text-[#e11d48] border border-white/5' : 'hover:bg-slate-800/50'}`}>
+                  <Users size={20} /> Team Users
+                </button>
+              )}
             </div>
           )}
         </nav>
@@ -450,10 +543,10 @@ ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
             </div>
           )}
           
-          {activeTab === 'dashboard' && <Dashboard tasks={tasks} />}
+          {activeTab === 'dashboard' && <Dashboard tasks={tasks} areas={areas} />}
           {activeTab === 'analytics' && <AnalyticsReport tasks={tasks} />}
           {activeTab === 'users' && <UserManagement currentUser={currentUser!} />}
-          {activeTab === 'workspace' && <WorkspaceManagement taskTypes={taskTypes} setTaskTypes={updateTaskTypes} areas={areas} setAreas={updateAreas} />}
+          {activeTab === 'workspace' && <WorkspaceManagement taskTypes={taskTypes} setTaskTypes={updateTaskTypes} areas={areas} setAreas={updateAreas} currentUser={currentUser} />}
           
           {activeTab === 'ai' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 animate-in zoom-in-95 duration-500">

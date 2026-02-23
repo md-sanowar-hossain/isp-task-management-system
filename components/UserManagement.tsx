@@ -27,17 +27,44 @@ const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) => {
 
   // ✅ LOAD USERS FROM SUPABASE
   const fetchUsers = async () => {
+    // only load users from the current workspace
     const { data } = await supabase
       .from('users')
       .select('*')
+      .eq('workspace_id', currentUser.workspace_id)
       .order('created_at', { ascending: false });
 
     setUsers(data || []);
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    let channel: any | null = null;
+
+    const setup = async () => {
+      await fetchUsers();
+
+      try {
+        channel = supabase
+          .channel(`users_ws_${currentUser.workspace_id}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `workspace_id=eq.${currentUser.workspace_id}` }, (payload) => {
+            console.log('realtime users event', payload);
+            fetchUsers();
+          })
+          .subscribe();
+      } catch (err) {
+        console.warn('Could not open realtime channel for users', err);
+      }
+    };
+
+    setup();
+
+    return () => {
+      if (channel && typeof channel.unsubscribe === 'function') {
+        try { channel.unsubscribe(); } catch (e) { /* ignore */ }
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser]);
 
   // ✅ DELETE USER
 const deleteUser = async (userId: string) => {
@@ -88,7 +115,8 @@ const deleteUser = async (userId: string) => {
         fullName: newUserData.fullName || newUserData.username,
         username: newUserData.username,
         password: newUserData.password,
-        role: newUserData.role
+        role: newUserData.role,
+        workspace_id: currentUser.workspace_id // ensure new user joins current workspace
       }
     ]);
 
@@ -220,13 +248,8 @@ const deleteUser = async (userId: string) => {
 
 export default UserManagement;
 
-function DeleteWithConfirm({
-  children,
-  onConfirm,
-}: {
-  children: React.ReactNode;
-  onConfirm: () => void;
-}) {
+// Reuse TaskTable's inline DeleteWithConfirm to keep delete UX consistent
+function DeleteWithConfirm({ children, onConfirm }: { children: React.ReactNode; onConfirm: () => void }) {
   const [open, setOpen] = React.useState(false);
   const [position, setPosition] = React.useState<{ top: number; left: number } | null>(null);
   const btnRef = React.useRef<HTMLButtonElement | null>(null);
@@ -238,7 +261,7 @@ function DeleteWithConfirm({
 
     setPosition({
       top: rect.top + rect.height / 2,
-      left: rect.left - 8, // 👈 বাম পাশে
+      left: rect.left - 8,
     });
 
     setOpen(true);
@@ -249,7 +272,7 @@ function DeleteWithConfirm({
       <button
         ref={btnRef}
         onClick={handleClick}
-        className="p-2 text-rose-600 hover:bg-rose-50 rounded-xl transition"
+        className="p-2 text-rose-400 hover:text-white hover:bg-rose-600 transition-all bg-white rounded-xl border border-rose-100 hover:border-rose-600 shadow-sm active:scale-90"
       >
         {children}
       </button>
@@ -258,17 +281,15 @@ function DeleteWithConfirm({
         createPortal(
           <div
             style={{
-              position: "fixed",
+              position: 'fixed',
               top: position.top,
               left: position.left,
-              transform: "translate(-100%, -50%)",
+              transform: 'translate(-100%, -50%)',
               zIndex: 9999,
             }}
           >
             <div className="w-60 bg-white border border-slate-200 rounded-xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-150">
-              <div className="text-sm font-bold text-slate-800 mb-3">
-                Confirm deletion?
-              </div>
+              <div className="text-sm font-bold text-slate-800 mb-3">Confirm deletion?</div>
 
               <div className="flex justify-end gap-2">
                 <button
