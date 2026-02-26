@@ -58,7 +58,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ taskTypes, areas, onSave, onCancel 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.userId || !formData.taskType || !formData.area || !formData.status) {
+    if (!formData.taskType || !formData.area || !formData.status) {
       alert("Please fill all required fields.");
       return;
     }
@@ -103,7 +103,6 @@ const TaskForm: React.FC<TaskFormProps> = ({ taskTypes, areas, onSave, onCancel 
           <label className={labelClass}>User ID</label>
           <input
             type="text"
-            required
             placeholder="e.g. dk123"
             className={inputClassBase}
             value={formData.userId}
@@ -171,7 +170,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ taskTypes, areas, onSave, onCancel 
 
       {/* Remarks Field - Extra Option */}
       <div className="w-full">
-        <label className={labelClass}>Remarks / Note (Optional)</label>
+        <label className={labelClass}>Remarks / Note</label>
         <div className="relative group">
           <input
             type="text"

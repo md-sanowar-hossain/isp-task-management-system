@@ -67,6 +67,8 @@ const App: React.FC = () => {
   // ---------- Search & filter ----------
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Complete' | 'Pending'>('All');
+  const [taskTypeFilter, setTaskTypeFilter] = useState<string>('All');
+  const [areaFilter, setAreaFilter] = useState<string>('All');
 
   // ---------- AI/chat state (kept as-is) ----------
   const [aiInsight, setAiInsight] = useState<string | null>(null);
@@ -271,7 +273,10 @@ const deleteTask = async (id: any) => {
       (task.remarks && task.remarks.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesStatus = statusFilter === 'All' || task.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesTaskType = taskTypeFilter === 'All' || task.taskType === taskTypeFilter;
+    const matchesArea = areaFilter === 'All' || task.area === areaFilter;
+
+    return matchesSearch && matchesStatus && matchesTaskType && matchesArea;
   });
 
   // ---------- AI / Chat helpers (unchanged) ----------
@@ -574,6 +579,28 @@ ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
                         <option value="All">All Status</option>
                         <option value="Complete">Complete</option>
                         <option value="Pending">Pending</option>
+                      </select>
+                    </div>
+                    <div className="relative group">
+                      <Filter size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-rose-500 transition-colors" />
+                      <select
+                        value={taskTypeFilter}
+                        onChange={(e) => setTaskTypeFilter(e.target.value)}
+                        className="w-full pl-11 pr-10 py-3 bg-white border-2 border-slate-100 rounded-2xl text-xs font-black text-slate-900 focus:border-rose-500 outline-none transition-all appearance-none shadow-sm"
+                      >
+                        <option value="All">All Task Types</option>
+                        {taskTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div className="relative group">
+                      <Filter size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-rose-500 transition-colors" />
+                      <select
+                        value={areaFilter}
+                        onChange={(e) => setAreaFilter(e.target.value)}
+                        className="w-full pl-11 pr-10 py-3 bg-white border-2 border-slate-100 rounded-2xl text-xs font-black text-slate-900 focus:border-rose-500 outline-none transition-all appearance-none shadow-sm"
+                      >
+                        <option value="All">All Areas</option>
+                        {areas.map((a) => <option key={a} value={a}>{a}</option>)}
                       </select>
                     </div>
                   </div>

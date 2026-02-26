@@ -15,9 +15,59 @@ const TaskTable: React.FC<TaskTableProps> = ({ tasks, currentUser, onDelete, onU
   // Normalize role check for robust permission handling
   // Permission checks removed: anyone can act
 
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [pct, setPct] = useState(0);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const update = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      const value = max > 0 ? Math.round((el.scrollLeft / max) * 100) : 0;
+      setPct(value);
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      el.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
+  const onRange = (v: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    el.scrollLeft = Math.round((v / 100) * max);
+    setPct(v);
+  };
+
   return (
     <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden">
-      <div className="overflow-x-auto">
+      {/* slider area above table - leave some empty space and larger track */}
+      <div className="px-6 pt-4 pb-2">
+        <div className="max-w-full mx-auto">
+          <input
+            aria-label="Table horizontal scroll"
+            type="range"
+            min={0}
+            max={100}
+            value={pct}
+            onChange={(e) => onRange(Number(e.target.value))}
+            className="w-full h-3 appearance-none bg-transparent"
+            style={{ WebkitAppearance: 'none' }}
+          />
+          <style>{`
+            input[type=range] { outline: none; }
+            input[type=range]::-webkit-slider-runnable-track { height:8px; background: #eef2ff; border-radius: 999px; }
+            input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; background:#e11d48; border-radius:50%; margin-top:-3px; box-shadow:0 0 0 6px rgba(225,29,72,0.12);} 
+            input[type=range]::-moz-range-track { height:8px; background:#eef2ff; border-radius:999px; }
+            input[type=range]::-moz-range-thumb { width:14px; height:14px; background:#e11d48; border-radius:50%; border:none; }
+          `}</style>
+        </div>
+      </div>
+      <div className="overflow-x-auto" ref={scrollRef}>
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
