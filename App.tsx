@@ -173,6 +173,19 @@ const App: React.FC = () => {
         createdBy: currentUser.username,
         workspace_id: currentUser.workspace_id, // 🔥 ensure workspace is set on insert
       };
+<<<<<<< HEAD
+=======
+      // Ensure we don't send an `id` field (or null) to the DB; let the DB generate it.
+      if ('id' in insertPayload) {
+        // remove id if it's undefined/null to avoid violating NOT NULL constraints
+        if (insertPayload.id === undefined || insertPayload.id === null) {
+          // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+          delete (insertPayload as any).id;
+        } else {
+          console.warn('Inserting with explicit id:', insertPayload.id);
+        }
+      }
+>>>>>>> 3bf98af (update project)
 
       const { error } = await supabase.from('tasks').insert([insertPayload]);
 
@@ -264,6 +277,51 @@ const deleteTask = async (id: any) => {
     });
   };
 
+<<<<<<< HEAD
+=======
+  // ---------- EDIT TASK (Supabase update) ----------
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  const updateTask = async (payload: { id?: string; date: string; userId: string; taskType: string; area: string; status: Status; remarks?: string }) => {
+    if (!currentUser) {
+      alert('No user logged in.');
+      return;
+    }
+    if (!payload.id) {
+      alert('No task id provided for update.');
+      return;
+    }
+
+    try {
+      const updateData: any = {
+        date: payload.date,
+        userId: payload.userId,
+        taskType: payload.taskType,
+        area: payload.area,
+        status: payload.status,
+        remarks: payload.remarks || null,
+      };
+
+      const { error } = await supabase.from('tasks')
+        .update(updateData)
+        .eq('id', payload.id)
+        .eq('workspace_id', currentUser.workspace_id);
+
+      if (error) {
+        console.error('Update error:', error);
+        alert('Could not update task. See console.');
+        return;
+      }
+
+      setEditingTask(null);
+      await fetchTasks();
+      showNotice('Task updated');
+    } catch (err) {
+      console.error('updateTask unexpected:', err);
+    }
+  };
+
+>>>>>>> 3bf98af (update project)
   // ---------- Filtered tasks for UI ----------
   const filteredTasks = tasks.filter(task => {
     const matchesSearch =
@@ -538,7 +596,11 @@ ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
           </div>
         </header>
 
+<<<<<<< HEAD
         <div className="p-4 md:p-10 max-w-7xl mx-auto space-y-8 md:space-y-12 pb-32 print:p-0">
+=======
+        <div className="p-2 md:p-6 w-full max-w-full mx-auto space-y-6 md:space-y-12 pb-32 print:p-0">
+>>>>>>> 3bf98af (update project)
           {activeTab === 'tasks' && (
             <div className="space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
               <section className="space-y-4 md:space-y-6">
@@ -605,7 +667,32 @@ ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
                     </div>
                   </div>
                 </div>
+<<<<<<< HEAD
                 <TaskTable tasks={filteredTasks} currentUser={currentUser!} onDelete={deleteTask} onUpdateStatus={updateStatus} />
+=======
+                <TaskTable tasks={filteredTasks} currentUser={currentUser!} onDelete={deleteTask} onUpdateStatus={updateStatus} onEdit={(t) => setEditingTask(t)} />
+                {/* Edit modal */}
+                {editingTask && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div className="w-full max-w-3xl p-6">
+                      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-black">Edit Task</h3>
+                          <button onClick={() => setEditingTask(null)} className="text-slate-500 hover:text-slate-900">Close</button>
+                        </div>
+                        <TaskForm
+                          taskTypes={taskTypes}
+                          areas={areas}
+                          initialTask={editingTask}
+                          onSave={updateTask}
+                          onCancel={() => setEditingTask(null)}
+                          compact={true}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+>>>>>>> 3bf98af (update project)
               </section>
             </div>
           )}
