@@ -2,27 +2,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Task, Status, User } from '../types';
-<<<<<<< HEAD
-import { Trash2, CheckCircle, Clock, AlertCircle, Info } from 'lucide-react';
-=======
 import { Trash2, CheckCircle, Clock, AlertCircle, Info, Edit } from 'lucide-react';
->>>>>>> 3bf98af (update project)
 
 interface TaskTableProps {
   tasks: Task[];
   currentUser: User;
   onDelete: (id: string) => void;
   onUpdateStatus: (id: string, status: Status) => void;
-<<<<<<< HEAD
-}
-
-const TaskTable: React.FC<TaskTableProps> = ({ tasks, currentUser, onDelete, onUpdateStatus }) => {
-=======
   onEdit?: (task: Task) => void;
 }
 
 const TaskTable: React.FC<TaskTableProps> = ({ tasks, currentUser, onDelete, onUpdateStatus, onEdit }) => {
->>>>>>> 3bf98af (update project)
   // Normalize role check for robust permission handling
   // Permission checks removed: anyone can act
 
@@ -55,11 +45,7 @@ const TaskTable: React.FC<TaskTableProps> = ({ tasks, currentUser, onDelete, onU
   };
 
   return (
-<<<<<<< HEAD
-    <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden">
-=======
     <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden w-full">
->>>>>>> 3bf98af (update project)
       {/* slider area above table - leave some empty space and larger track */}
       <div className="px-6 pt-4 pb-2">
         <div className="max-w-full mx-auto">
@@ -148,8 +134,6 @@ const TaskTable: React.FC<TaskTableProps> = ({ tasks, currentUser, onDelete, onU
                       >
                         <CheckCircle size={18} />
                       </button>
-<<<<<<< HEAD
-=======
                       <button
                         onClick={() => onEdit && onEdit(task)}
                         className="p-2 text-slate-400 hover:text-sky-600 transition-all bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md active:scale-90"
@@ -157,7 +141,6 @@ const TaskTable: React.FC<TaskTableProps> = ({ tasks, currentUser, onDelete, onU
                       >
                         <Edit size={18} />
                       </button>
->>>>>>> 3bf98af (update project)
                       <DeleteWithConfirm onConfirm={() => onDelete(task.id)}>
                         <Trash2 size={18} />
                       </DeleteWithConfirm>

@@ -2,11 +2,7 @@
 import React, { useState, useRef } from 'react';
 import ReactDatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-<<<<<<< HEAD
-import { Status } from '../types';
-=======
 import { Status, Task } from '../types';
->>>>>>> 3bf98af (update project)
 import { STATUSES } from '../constants';
 import { format } from 'date-fns';
 import { Calendar, AlignLeft } from 'lucide-react';
@@ -14,13 +10,6 @@ import { Calendar, AlignLeft } from 'lucide-react';
 interface TaskFormProps {
   taskTypes: string[];
   areas: string[];
-<<<<<<< HEAD
-  onSave: (task: { date: string; userId: string; taskType: string; area: string; status: Status; remarks?: string }) => void;
-  onCancel?: () => void;
-}
-
-const TaskForm: React.FC<TaskFormProps> = ({ taskTypes, areas, onSave, onCancel }) => {
-=======
   // onSave receives the form payload; when editing it may include `id` for the existing task
   onSave: (task: { id?: string; date: string; userId: string; taskType: string; area: string; status: Status; remarks?: string }) => void;
   onCancel?: () => void;
@@ -29,7 +18,6 @@ const TaskForm: React.FC<TaskFormProps> = ({ taskTypes, areas, onSave, onCancel 
 }
 
 const TaskForm: React.FC<TaskFormProps> = ({ taskTypes, areas, onSave, onCancel, initialTask = null, compact = false }) => {
->>>>>>> 3bf98af (update project)
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     userId: '',
@@ -37,12 +25,8 @@ const TaskForm: React.FC<TaskFormProps> = ({ taskTypes, areas, onSave, onCancel,
     area: '',
     status: 'Pending' as Status,
     remarks: '',
-<<<<<<< HEAD
-  });
-=======
     id: undefined as string | undefined,
   } as { id?: string; date: string; userId: string; taskType: string; area: string; status: Status; remarks?: string });
->>>>>>> 3bf98af (update project)
 
   const dateInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -64,8 +48,6 @@ const TaskForm: React.FC<TaskFormProps> = ({ taskTypes, areas, onSave, onCancel,
   // react-datepicker state
   const [dateObj, setDateObj] = useState<Date>(new Date());
 
-<<<<<<< HEAD
-=======
   // initialize form when editing
   React.useEffect(() => {
     if (initialTask) {
@@ -90,7 +72,6 @@ const TaskForm: React.FC<TaskFormProps> = ({ taskTypes, areas, onSave, onCancel,
 
     const gridClasses = compact ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6';
 
->>>>>>> 3bf98af (update project)
   const DateInput = React.forwardRef<HTMLButtonElement, any>(({ value, onClick }, ref) => (
     <button type="button" onClick={onClick} ref={ref} className={`${inputClassBase} text-left`}> 
       <div className="flex items-center justify-between">
@@ -110,11 +91,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ taskTypes, areas, onSave, onCancel,
       return;
     }
     // ensure date from dateObj is sent in ISO format expected by parent
-<<<<<<< HEAD
-    const payload = { ...formData, date: format(dateObj, 'yyyy-MM-dd') } as { date: string; userId: string; taskType: string; area: string; status: Status; remarks?: string };
-=======
     const payload = { ...formData, date: format(dateObj, 'yyyy-MM-dd') } as { id?: string; date: string; userId: string; taskType: string; area: string; status: Status; remarks?: string };
->>>>>>> 3bf98af (update project)
     onSave(payload);
     setFormData({
       date: format(new Date(), 'yyyy-MM-dd'),
@@ -123,28 +100,15 @@ const TaskForm: React.FC<TaskFormProps> = ({ taskTypes, areas, onSave, onCancel,
       area: '',
       status: 'Pending',
       remarks: '',
-<<<<<<< HEAD
-=======
       id: undefined,
->>>>>>> 3bf98af (update project)
     });
     setDateObj(new Date());
   };
 
-<<<<<<< HEAD
-  const inputClassBase = "w-full px-5 py-4 bg-white border-2 border-slate-300 rounded-2xl focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all text-slate-900 font-bold placeholder:text-slate-500 shadow-sm";
-  const selectClass = `${inputClassBase} appearance-none`;
-  const labelClass = "block text-[12px] font-black text-slate-600 uppercase tracking-widest mb-2 ml-1";
-
-  return (
-    <form onSubmit={handleSubmit} className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-xl space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-=======
 
   return (
     <form onSubmit={handleSubmit} className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-xl space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
       <div className={gridClasses}>
->>>>>>> 3bf98af (update project)
         {/* Date Field */}
         <div className="lg:col-span-1">
           <label className={labelClass}>Date</label>

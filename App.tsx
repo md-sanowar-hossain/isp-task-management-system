@@ -173,8 +173,6 @@ const App: React.FC = () => {
         createdBy: currentUser.username,
         workspace_id: currentUser.workspace_id, // 🔥 ensure workspace is set on insert
       };
-<<<<<<< HEAD
-=======
       // Ensure we don't send an `id` field (or null) to the DB; let the DB generate it.
       if ('id' in insertPayload) {
         // remove id if it's undefined/null to avoid violating NOT NULL constraints
@@ -185,7 +183,6 @@ const App: React.FC = () => {
           console.warn('Inserting with explicit id:', insertPayload.id);
         }
       }
->>>>>>> 3bf98af (update project)
 
       const { error } = await supabase.from('tasks').insert([insertPayload]);
 
@@ -277,8 +274,6 @@ const deleteTask = async (id: any) => {
     });
   };
 
-<<<<<<< HEAD
-=======
   // ---------- EDIT TASK (Supabase update) ----------
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
@@ -321,7 +316,6 @@ const deleteTask = async (id: any) => {
     }
   };
 
->>>>>>> 3bf98af (update project)
   // ---------- Filtered tasks for UI ----------
   const filteredTasks = tasks.filter(task => {
     const matchesSearch =
@@ -596,11 +590,7 @@ ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
           </div>
         </header>
 
-<<<<<<< HEAD
-        <div className="p-4 md:p-10 max-w-7xl mx-auto space-y-8 md:space-y-12 pb-32 print:p-0">
-=======
         <div className="p-2 md:p-6 w-full max-w-full mx-auto space-y-6 md:space-y-12 pb-32 print:p-0">
->>>>>>> 3bf98af (update project)
           {activeTab === 'tasks' && (
             <div className="space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
               <section className="space-y-4 md:space-y-6">
@@ -667,9 +657,6 @@ ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
                     </div>
                   </div>
                 </div>
-<<<<<<< HEAD
-                <TaskTable tasks={filteredTasks} currentUser={currentUser!} onDelete={deleteTask} onUpdateStatus={updateStatus} />
-=======
                 <TaskTable tasks={filteredTasks} currentUser={currentUser!} onDelete={deleteTask} onUpdateStatus={updateStatus} onEdit={(t) => setEditingTask(t)} />
                 {/* Edit modal */}
                 {editingTask && (
@@ -692,7 +679,6 @@ ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
                     </div>
                   </div>
                 )}
->>>>>>> 3bf98af (update project)
               </section>
             </div>
           )}
